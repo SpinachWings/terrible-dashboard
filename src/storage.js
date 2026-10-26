@@ -1,4 +1,5 @@
 import { SAMPLE_CSV } from './sampleData';
+import { DEFAULT_COLOUR_SETTINGS } from './colours';
 
 const STORAGE_KEY = 'terrible-dashboard:v1';
 
@@ -8,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   xColumn: null, // null = pick automatically
   yColumns: null, // null = pick automatically
   title: 'Monthly performance',
+  ...DEFAULT_COLOUR_SETTINGS, // theme + palette
 };
 
 export function loadSettings() {

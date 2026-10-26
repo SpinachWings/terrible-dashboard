@@ -3,6 +3,21 @@ import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { parseCsv } from './csv';
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './storage';
+import { PALETTES, THEMES, highchartsColourOptions, resolveTheme } from './colours';
+
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+function useSystemDark() {
+  const [dark, setDark] = useState(() => window.matchMedia?.(DARK_QUERY).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(DARK_QUERY);
+    if (!mq) return undefined;
+    const onChange = (e) => setDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return dark;
+}
 
 const CHART_TYPES = [
   { id: 'bar', label: 'Bar' },
@@ -12,7 +27,15 @@ const CHART_TYPES = [
 
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
-  const { csvText, chartType, xColumn, yColumns, title } = settings;
+  const { csvText, chartType, xColumn, yColumns, title, theme, palette } = settings;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const systemDark = useSystemDark();
+  const resolvedTheme = resolveTheme(theme, systemDark);
+
+  // Apply the theme dashboard-wide via a data attribute read by the CSS variables.
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
 
   // Persist every change to localStorage.
   useEffect(() => saveSettings(settings), [settings]);
@@ -60,22 +83,31 @@ export default function App() {
             data: rows.map((r) => (typeof r[col] === 'number' ? r[col] : null)),
           }));
 
+    const colour = highchartsColourOptions(palette, resolvedTheme);
     return {
-      chart: { height: 480, style: { fontFamily: 'inherit' } },
-      title: { text: title || null },
+      colors: colour.colors,
+      chart: { ...colour.chart, height: 480, style: { ...colour.chart.style, fontFamily: 'inherit' } },
+      title: { ...colour.title, text: title || null },
       credits: { enabled: false },
-      xAxis: { categories: rows.map(label), title: { text: xCol } },
-      yAxis: { title: { text: null } },
-      tooltip: { shared: chartType !== 'pie' },
+      xAxis: { ...colour.xAxis, categories: rows.map(label), title: { ...colour.xAxis.title, text: xCol } },
+      yAxis: { ...colour.yAxis, title: { ...colour.yAxis.title, text: null } },
+      legend: colour.legend,
+      tooltip: { ...colour.tooltip, shared: chartType !== 'pie' },
       plotOptions: {
+        series: colour.plotOptions.series,
         pie: {
+          ...colour.plotOptions.pie,
           allowPointSelect: true,
-          dataLabels: { enabled: true, format: '{point.name}: {point.percentage:.1f}%' },
+          dataLabels: {
+            ...colour.plotOptions.pie.dataLabels,
+            enabled: true,
+            format: '{point.name}: {point.percentage:.1f}%',
+          },
         },
       },
       series,
     };
-  }, [rows, xCol, yCols.join('|'), chartType, title]);
+  }, [rows, xCol, yCols.join('|'), chartType, title, palette, resolvedTheme]);
 
   const hasChart = rows.length > 0 && yCols.length > 0;
 
@@ -84,6 +116,53 @@ export default function App() {
       <header className="header">
         <h1>Terrible Dashboard</h1>
         <span className="muted">Saved automatically in this browser</span>
+        <div className="settings-menu">
+          <button
+            className="settings-btn"
+            aria-expanded={menuOpen}
+            aria-controls="settings-popover"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            ⚙ Settings
+          </button>
+          {menuOpen && (
+            <div id="settings-popover" className="popover" role="dialog" aria-label="Colour settings">
+              <h2>Theme</h2>
+              <div className="segmented" role="radiogroup" aria-label="Theme">
+                {THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    role="radio"
+                    aria-checked={theme === t.id}
+                    className={theme === t.id ? 'active' : ''}
+                    onClick={() => update({ theme: t.id })}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <h2>Chart colours</h2>
+              <div role="radiogroup" aria-label="Chart colour palette">
+                {PALETTES.map((p) => (
+                  <label key={p.id} className="check palette-option">
+                    <input
+                      type="radio"
+                      name="palette"
+                      checked={palette === p.id}
+                      onChange={() => update({ palette: p.id })}
+                    />
+                    <span>{p.label}</span>
+                    <span className="swatches" aria-hidden="true">
+                      {p.colors.slice(0, 5).map((c) => (
+                        <i key={c} style={{ background: c }} />
+                      ))}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="layout">
@@ -105,7 +184,7 @@ export default function App() {
               <span className="muted">
                 {rows.length} rows · {columns.length} columns
               </span>
-              <button className="link" onClick={() => setSettings(DEFAULT_SETTINGS)}>
+              <button className="link" onClick={() => setSettings((s) => ({ ...DEFAULT_SETTINGS, theme: s.theme, palette: s.palette }))}>
                 Reset to sample
               </button>
             </div>
