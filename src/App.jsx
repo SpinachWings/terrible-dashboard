@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { parseCsv } from './csv';
-import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './storage';
+import { DEFAULT_SETTINGS, loadSettings, newChart, saveSettings } from './storage';
 import { PALETTES, THEMES, highchartsColourOptions, resolveTheme } from './colours';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
@@ -25,47 +25,22 @@ const CHART_TYPES = [
   { id: 'pie', label: 'Pie' },
 ];
 
-export default function App() {
-  const [settings, setSettings] = useState(loadSettings);
-  const { csvText, chartType, xColumn, yColumns, title, theme, palette } = settings;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const systemDark = useSystemDark();
-  const resolvedTheme = resolveTheme(theme, systemDark);
-
-  // Apply the theme dashboard-wide via a data attribute read by the CSS variables.
-  useEffect(() => {
-    document.documentElement.dataset.theme = resolvedTheme;
-  }, [resolvedTheme]);
-
-  // Persist every change to localStorage.
-  useEffect(() => saveSettings(settings), [settings]);
-
-  const update = (patch) => setSettings((s) => ({ ...s, ...patch }));
-
-  const { columns, rows, numericColumns, error } = useMemo(() => parseCsv(csvText), [csvText]);
-
+// Resolve a chart's saved column choices against the current data.
+function resolveColumns(chart, { columns, numericColumns }) {
   // Category (x-axis / slice label) column: saved choice if still valid, else first non-numeric column.
-  const xCol = columns.includes(xColumn)
-    ? xColumn
+  const xCol = columns.includes(chart.xColumn)
+    ? chart.xColumn
     : columns.find((c) => !numericColumns.includes(c)) ?? columns[0];
-
   const valueOptions = numericColumns.filter((c) => c !== xCol);
   const yCols =
-    yColumns === null ? valueOptions : yColumns.filter((c) => valueOptions.includes(c));
+    chart.yColumns === null ? valueOptions : chart.yColumns.filter((c) => valueOptions.includes(c));
+  return { xCol, valueOptions, yCols };
+}
 
-  const toggleY = (col) => {
-    const next = yCols.includes(col) ? yCols.filter((c) => c !== col) : [...yCols, col];
-    update({ yColumns: valueOptions.filter((c) => next.includes(c)) }); // keep column order
-  };
-
-  const loadText = (text) => update({ csvText: text, xColumn: null, yColumns: null });
-
-  const onFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    loadText(await file.text());
-    e.target.value = ''; // allow re-uploading the same file
-  };
+function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, canRemove, onSelect, onRemove }) {
+  const { rows } = data;
+  const { chartType, title } = chart;
+  const { xCol, yCols } = resolveColumns(chart, data);
 
   const options = useMemo(() => {
     const label = (r) => String(r[xCol] ?? '');
@@ -86,7 +61,7 @@ export default function App() {
     const colour = highchartsColourOptions(palette, resolvedTheme);
     return {
       colors: colour.colors,
-      chart: { ...colour.chart, height: 480, style: { ...colour.chart.style, fontFamily: 'inherit' } },
+      chart: { ...colour.chart, height, style: { ...colour.chart.style, fontFamily: 'inherit' } },
       title: { ...colour.title, text: title || null },
       credits: { enabled: false },
       xAxis: { ...colour.xAxis, categories: rows.map(label), title: { ...colour.xAxis.title, text: xCol } },
@@ -107,9 +82,108 @@ export default function App() {
       },
       series,
     };
-  }, [rows, xCol, yCols.join('|'), chartType, title, palette, resolvedTheme]);
+  }, [rows, xCol, yCols.join('|'), chartType, title, height, palette, resolvedTheme]);
 
   const hasChart = rows.length > 0 && yCols.length > 0;
+
+  return (
+    <section className={`chart-card${selected ? ' selected' : ''}`} onClick={onSelect}>
+      {canRemove && (
+        <button
+          className="remove-chart"
+          aria-label="Remove chart"
+          title="Remove chart"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          ×
+        </button>
+      )}
+      {hasChart ? (
+        <HighchartsReact key={chartType} highcharts={Highcharts} options={options} />
+      ) : (
+        <p className="empty">
+          {rows.length === 0
+            ? 'Paste or upload a CSV with a header row to get started.'
+            : 'Select at least one value column to plot.'}
+        </p>
+      )}
+    </section>
+  );
+}
+
+export default function App() {
+  const [settings, setSettings] = useState(loadSettings);
+  const { csvText, charts, selectedId, theme, palette } = settings;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const systemDark = useSystemDark();
+  const resolvedTheme = resolveTheme(theme, systemDark);
+
+  // Apply the theme dashboard-wide via a data attribute read by the CSS variables.
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
+
+  // Persist every change to localStorage.
+  useEffect(() => saveSettings(settings), [settings]);
+
+  const update = (patch) => setSettings((s) => ({ ...s, ...patch }));
+
+  const data = useMemo(() => parseCsv(csvText), [csvText]);
+  const { columns, rows, error } = data;
+
+  const selected = charts.find((c) => c.id === selectedId) ?? charts[0];
+  const { chartType, title } = selected;
+  const { xCol, valueOptions, yCols } = resolveColumns(selected, data);
+
+  const select = (id) => setSettings((s) => ({ ...s, selectedId: id }));
+
+  const updateSelected = (patch) =>
+    setSettings((s) => ({
+      ...s,
+      charts: s.charts.map((c) => (c.id === selected.id ? { ...c, ...patch } : c)),
+    }));
+
+  const addChart = () =>
+    setSettings((s) => {
+      const chart = newChart({ title: `Chart ${s.charts.length + 1}` });
+      return { ...s, charts: [...s.charts, chart], selectedId: chart.id };
+    });
+
+  const removeChart = (id) =>
+    setSettings((s) => {
+      if (s.charts.length <= 1) return s;
+      const remaining = s.charts.filter((c) => c.id !== id);
+      return {
+        ...s,
+        charts: remaining,
+        selectedId: s.selectedId === id ? remaining[0].id : s.selectedId,
+      };
+    });
+
+  const toggleY = (col) => {
+    const next = yCols.includes(col) ? yCols.filter((c) => c !== col) : [...yCols, col];
+    updateSelected({ yColumns: valueOptions.filter((c) => next.includes(c)) }); // keep column order
+  };
+
+  // New data invalidates every chart's column choices.
+  const loadText = (text) =>
+    setSettings((s) => ({
+      ...s,
+      csvText: text,
+      charts: s.charts.map((c) => ({ ...c, xColumn: null, yColumns: null })),
+    }));
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    loadText(await file.text());
+    e.target.value = ''; // allow re-uploading the same file
+  };
+
+  const multi = charts.length > 1;
 
   return (
     <div className="app">
@@ -192,7 +266,24 @@ export default function App() {
           </section>
 
           <section>
-            <h2>Chart</h2>
+            <h2>Charts</h2>
+            <div className="chart-tabs" role="tablist" aria-label="Charts">
+              {charts.map((c, i) => (
+                <button
+                  key={c.id}
+                  role="tab"
+                  aria-selected={c.id === selected.id}
+                  className={c.id === selected.id ? 'active' : ''}
+                  onClick={() => select(c.id)}
+                >
+                  {c.title || `Chart ${i + 1}`}
+                </button>
+              ))}
+              <button className="add-chart" onClick={addChart}>
+                + Add chart
+              </button>
+            </div>
+
             <div className="segmented" role="radiogroup" aria-label="Chart type">
               {CHART_TYPES.map((t) => (
                 <button
@@ -200,7 +291,7 @@ export default function App() {
                   role="radio"
                   aria-checked={chartType === t.id}
                   className={chartType === t.id ? 'active' : ''}
-                  onClick={() => update({ chartType: t.id })}
+                  onClick={() => updateSelected({ chartType: t.id })}
                 >
                   {t.label}
                 </button>
@@ -209,14 +300,14 @@ export default function App() {
 
             <label className="field">
               Title
-              <input value={title} onChange={(e) => update({ title: e.target.value })} />
+              <input value={title} onChange={(e) => updateSelected({ title: e.target.value })} />
             </label>
 
             <label className="field">
               {chartType === 'pie' ? 'Slice labels' : 'X-axis (categories)'}
               <select
                 value={xCol ?? ''}
-                onChange={(e) => update({ xColumn: e.target.value, yColumns: null })}
+                onChange={(e) => updateSelected({ xColumn: e.target.value, yColumns: null })}
               >
                 {columns.map((c) => (
                   <option key={c}>{c}</option>
@@ -240,16 +331,21 @@ export default function App() {
           </section>
         </aside>
 
-        <main className="chart-card">
-          {hasChart ? (
-            <HighchartsReact key={chartType} highcharts={Highcharts} options={options} />
-          ) : (
-            <p className="empty">
-              {rows.length === 0
-                ? 'Paste or upload a CSV with a header row to get started.'
-                : 'Select at least one value column to plot.'}
-            </p>
-          )}
+        <main className={`chart-grid${multi ? ' multi' : ''}`}>
+          {charts.map((c) => (
+            <ChartPanel
+              key={c.id}
+              chart={c}
+              data={data}
+              height={multi ? 340 : 480}
+              palette={palette}
+              resolvedTheme={resolvedTheme}
+              selected={multi && c.id === selected.id}
+              canRemove={multi}
+              onSelect={() => select(c.id)}
+              onRemove={() => removeChart(c.id)}
+            />
+          ))}
         </main>
       </div>
     </div>
