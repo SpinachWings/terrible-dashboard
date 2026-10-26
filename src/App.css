@@ -20,6 +20,44 @@
   background: var(--bg);
 }
 
+:root[data-theme='sepia'] {
+  --bg: #f1e7d3;
+  --card: #fbf3e4;
+  --text: #3b2f23;
+  --muted: #7a6a58;
+  --border: #dccdb5;
+  --accent: #a2562a;
+  --input-bg: #fffaf0;
+  --error: #a3261b;
+  --shadow: rgba(59, 47, 35, 0.2);
+}
+
+:root[data-theme='midnight'] {
+  --bg: #0a0f26;
+  --card: #121a3a;
+  --text: #dbe4ff;
+  --muted: #98a8d6;
+  --border: #26305a;
+  --accent: #5b7dff;
+  --input-bg: #0d1430;
+  --error: #ff8a80;
+  --shadow: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+:root[data-theme='forest'] {
+  --bg: #0f1a13;
+  --card: #18261d;
+  --text: #e2efe4;
+  --muted: #9bb5a0;
+  --border: #2a3d2f;
+  --accent: #3fa764;
+  --input-bg: #121e17;
+  --error: #ff8a80;
+  --shadow: rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
 :root[data-theme='dark'] {
   --bg: #11151f;
   --card: #1b2130;
@@ -175,6 +213,18 @@ button.link {
 
 .segmented button + button {
   border-left: 1px solid var(--border);
+}
+
+/* Many options (themes): lay out as a grid instead of one cramped row. */
+.segmented.wrap {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+}
+
+.segmented.wrap button + button {
+  border-left: none;
 }
 
 .segmented button.active {

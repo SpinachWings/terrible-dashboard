@@ -1,16 +1,18 @@
 // Colour configuration: a theme (surface colours) and a palette (chart series colours) are chosen independently.
 
+// `base` decides palette adjustments; `chart` is the Highcharts chrome. Surface colours live in App.css under [data-theme].
 export const THEMES = [
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
-  { id: 'system', label: 'Match system' },
+  { id: 'light', label: 'Light', base: 'light', chart: { text: '#1d2330', muted: '#6b7280', grid: '#e5e7eb', line: '#c3c9d3', bg: '#ffffff' } },
+  { id: 'dark', label: 'Dark', base: 'dark', chart: { text: '#e6e9ef', muted: '#a3abb9', grid: '#323a4a', line: '#4a5468', bg: '#1b2130' } },
+  { id: 'sepia', label: 'Sepia', base: 'light', chart: { text: '#3b2f23', muted: '#7a6a58', grid: '#e6dac8', line: '#cdbca4', bg: '#fbf3e4' } },
+  { id: 'midnight', label: 'Midnight', base: 'dark', chart: { text: '#dbe4ff', muted: '#98a8d6', grid: '#26305a', line: '#3a4880', bg: '#121a3a' } },
+  { id: 'forest', label: 'Forest', base: 'dark', chart: { text: '#e2efe4', muted: '#9bb5a0', grid: '#2a3d2f', line: '#41594a', bg: '#18261d' } },
 ];
 
-// Chart chrome per resolved theme.
-const CHART_THEME = {
-  light: { text: '#1d2330', muted: '#6b7280', grid: '#e5e7eb', line: '#c3c9d3', bg: '#ffffff' },
-  dark: { text: '#e6e9ef', muted: '#a3abb9', grid: '#323a4a', line: '#4a5468', bg: '#1b2130' },
-};
+// Selectable options in the menu: the concrete themes plus "Match system".
+export const THEME_OPTIONS = [...THEMES, { id: 'system', label: 'Match system' }];
+
+const themeById = (id) => THEMES.find((t) => t.id === id) ?? THEMES[0];
 
 export const PALETTES = [
   {
@@ -44,19 +46,19 @@ export const DEFAULT_COLOUR_SETTINGS = { theme: 'system', palette: 'default' };
 
 export function resolveTheme(theme, systemDark) {
   if (theme === 'system') return systemDark ? 'dark' : 'light';
-  return theme === 'dark' ? 'dark' : 'light';
+  return themeById(theme).id;
 }
 
 export function paletteColors(paletteId, resolvedTheme) {
   const p = PALETTES.find((x) => x.id === paletteId) ?? PALETTES[0];
-  if (p.id === 'highContrast' && resolvedTheme === 'dark') {
+  if (p.id === 'highContrast' && themeById(resolvedTheme).base === 'dark') {
     return p.colors.map((c) => HIGH_CONTRAST_DARK[c] ?? c);
   }
   return p.colors;
 }
 
 export function highchartsColourOptions(paletteId, resolvedTheme) {
-  const t = CHART_THEME[resolvedTheme];
+  const t = themeById(resolvedTheme).chart;
   const axis = {
     gridLineColor: t.grid,
     lineColor: t.line,

@@ -3,7 +3,7 @@ import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { parseCsv } from './csv';
 import { DEFAULT_SETTINGS, loadSettings, newChart, saveSettings } from './storage';
-import { PALETTES, THEMES, highchartsColourOptions, resolveTheme } from './colours';
+import { PALETTES, THEME_OPTIONS, highchartsColourOptions, resolveTheme } from './colours';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
@@ -202,8 +202,8 @@ export default function App() {
           {menuOpen && (
             <div id="settings-popover" className="popover" role="dialog" aria-label="Colour settings">
               <h2>Theme</h2>
-              <div className="segmented" role="radiogroup" aria-label="Theme">
-                {THEMES.map((t) => (
+              <div className="segmented wrap" role="radiogroup" aria-label="Theme">
+                {THEME_OPTIONS.map((t) => (
                   <button
                     key={t.id}
                     role="radio"
