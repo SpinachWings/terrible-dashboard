@@ -1,4 +1,5 @@
 import { SAMPLE_CSV } from './sampleData';
+import { DEFAULT_COLOUR_SETTINGS } from './colours';
 
 const STORAGE_KEY = 'terrible-dashboard:v1';
 
@@ -16,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   csvText: SAMPLE_CSV,
   charts: [newChart({ id: 'c0', title: 'Monthly performance' })],
   selectedId: 'c0',
+  ...DEFAULT_COLOUR_SETTINGS, // theme + palette, dashboard-wide
 };
 
 export function loadSettings() {
@@ -25,11 +27,13 @@ export function loadSettings() {
     const saved = JSON.parse(raw);
     // Older versions stored a single chart's settings at the top level.
     if (!Array.isArray(saved.charts)) {
-      const { csvText, ...chart } = saved;
+      const { csvText, theme, palette, ...chart } = saved;
       return {
         csvText: csvText ?? SAMPLE_CSV,
         charts: [newChart({ ...chart, id: 'c0' })],
         selectedId: 'c0',
+        theme: theme ?? DEFAULT_SETTINGS.theme,
+        palette: palette ?? DEFAULT_SETTINGS.palette,
       };
     }
     if (saved.charts.length === 0) return DEFAULT_SETTINGS;
