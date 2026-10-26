@@ -204,3 +204,78 @@ legend {
   text-align: center;
   margin-top: 200px;
 }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-content: start;
+}
+
+.chart-grid.multi {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+}
+
+.chart-grid.multi .chart-card {
+  min-height: 0;
+  cursor: pointer;
+}
+
+.chart-grid.multi .empty {
+  margin: 100px 0;
+}
+
+.chart-card {
+  position: relative;
+}
+
+.chart-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.remove-chart {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 1;
+  border: none;
+  background: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.remove-chart:hover {
+  color: #b42318;
+}
+
+.chart-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.chart-tabs button {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.chart-tabs button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.chart-tabs .add-chart {
+  border-style: dashed;
+  color: var(--accent);
+}
