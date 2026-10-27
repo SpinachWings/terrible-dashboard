@@ -61,7 +61,7 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
     const colour = highchartsColourOptions(palette, resolvedTheme);
     return {
       colors: colour.colors,
-      chart: { ...colour.chart, height, style: { ...colour.chart.style, fontFamily: 'inherit' } },
+      chart: { ...colour.chart, style: { ...colour.chart.style, fontFamily: 'inherit' } },
       title: { ...colour.title, text: title || null },
       credits: { enabled: false },
       xAxis: { ...colour.xAxis, categories: rows.map(label), title: { ...colour.xAxis.title, text: xCol } },
@@ -82,33 +82,115 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
       },
       series,
     };
-  }, [rows, xCol, yCols.join('|'), chartType, title, height, palette, resolvedTheme]);
+  }, [rows, xCol, yCols.join('|'), chartType, title, palette, resolvedTheme]);
 
   const hasChart = rows.length > 0 && yCols.length > 0;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const withHeight = (h) => ({ ...options, chart: { ...options.chart, height: h } });
+
+  // Escape closes the fullscreen view (or the open menu).
+  useEffect(() => {
+    if (!fullscreen && !menuOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      setFullscreen(false);
+      setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen, menuOpen]);
 
   return (
     <section className={`chart-card${selected ? ' selected' : ''}`} onClick={onSelect}>
-      {canRemove && (
+      <div className="chart-menu">
         <button
-          className="remove-chart"
-          aria-label="Remove chart"
-          title="Remove chart"
+          className="chart-menu-btn"
+          aria-label="Chart options"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          title="Chart options"
           onClick={(e) => {
             e.stopPropagation();
-            onRemove();
+            setMenuOpen((o) => !o);
           }}
         >
-          ×
+          ⋯
         </button>
-      )}
+        {menuOpen && (
+          <>
+            <div
+              className="chart-menu-backdrop"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(false);
+              }}
+            />
+            <div className="chart-menu-list" role="menu">
+              <button
+                role="menuitem"
+                disabled={!hasChart}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  setFullscreen(true);
+                }}
+              >
+                View fullscreen
+              </button>
+              {canRemove && (
+                <button
+                  role="menuitem"
+                  className="danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    onRemove();
+                  }}
+                >
+                  Remove chart
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
       {hasChart ? (
-        <HighchartsReact key={chartType} highcharts={Highcharts} options={options} />
+        <HighchartsReact key={chartType} highcharts={Highcharts} options={withHeight(height)} />
       ) : (
         <p className="empty">
           {rows.length === 0
             ? 'Paste or upload a CSV with a header row to get started.'
             : 'Select at least one value column to plot.'}
         </p>
+      )}
+      {fullscreen && hasChart && (
+        <div
+          className="fullscreen-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={title || 'Chart'}
+          onClick={(e) => {
+            e.stopPropagation();
+            setFullscreen(false);
+          }}
+        >
+          <div className="fullscreen-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="fullscreen-close"
+              aria-label="Exit fullscreen"
+              title="Exit fullscreen"
+              onClick={() => setFullscreen(false)}
+            >
+              ×
+            </button>
+            <HighchartsReact
+              key={chartType}
+              highcharts={Highcharts}
+              options={withHeight(Math.max(300, window.innerHeight - 120))}
+            />
+          </div>
+        </div>
       )}
     </section>
   );
