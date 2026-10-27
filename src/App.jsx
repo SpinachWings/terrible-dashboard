@@ -37,7 +37,13 @@ function resolveColumns(chart, { columns, numericColumns }) {
   return { xCol, valueOptions, yCols };
 }
 
-function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, canRemove, onSelect, onRemove }) {
+function chartCardClassName({ selected, dragging, over }) {
+  return ['chart-card', selected && 'selected', dragging && 'dragging', over && 'drop-target']
+    .filter(Boolean)
+    .join(' ');
+}
+
+function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, canRemove, reorder, onSelect, onRemove }) {
   const { rows } = data;
   const { chartType, title } = chart;
   const { xCol, yCols } = resolveColumns(chart, data);
@@ -101,7 +107,26 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
   }, [fullscreen, menuOpen]);
 
   return (
-    <section className={`chart-card${selected ? ' selected' : ''}`} onClick={onSelect}>
+    <section
+      className={chartCardClassName({ selected, dragging: reorder.dragging, over: reorder.over })}
+      onClick={onSelect}
+      onDragOver={reorder.onDragOver}
+      onDrop={reorder.onDrop}
+    >
+      {canRemove && (
+        <span
+          className="drag-handle"
+          draggable
+          role="button"
+          aria-label="Drag to reorder chart"
+          title="Drag to reorder"
+          onDragStart={reorder.onDragStart}
+          onDragEnd={reorder.onDragEnd}
+          onClick={(e) => e.stopPropagation()}
+        >
+          ⠿
+        </span>
+      )}
       <div className="chart-menu">
         <button
           className="chart-menu-btn"
@@ -244,7 +269,21 @@ export default function App() {
       };
     });
 
-  const toggleY = (col) => {
+  const [dragId, setDragId] = useState(null);
+  const [overId, setOverId] = useState(null);
+
+  // Move a chart to the position of the chart it was dropped on (grid order follows array order).
+  const moveChart = (fromId, toId) =>
+    setSettings((s) => {
+      const from = s.charts.findIndex((c) => c.id === fromId);
+      const to = s.charts.findIndex((c) => c.id === toId);
+      if (from < 0 || to < 0 || from === to) return s;
+      const next = [...s.charts];
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      return { ...s, charts: next };
+    });
+
+  const toggleY =(col) => {
     const next = yCols.includes(col) ? yCols.filter((c) => c !== col) : [...yCols, col];
     updateSelected({ yColumns: valueOptions.filter((c) => next.includes(c)) }); // keep column order
   };
@@ -423,6 +462,33 @@ export default function App() {
               resolvedTheme={resolvedTheme}
               selected={multi && c.id === selected.id}
               canRemove={multi}
+              reorder={{
+                dragging: dragId === c.id,
+                over: dragId !== null && overId === c.id && dragId !== c.id,
+                onDragStart: (e) => {
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', c.id);
+                  const card = e.currentTarget.closest('.chart-card');
+                  if (card) e.dataTransfer.setDragImage(card, 20, 20);
+                  setDragId(c.id);
+                },
+                onDragEnd: () => {
+                  setDragId(null);
+                  setOverId(null);
+                },
+                onDragOver: (e) => {
+                  if (dragId === null) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (overId !== c.id) setOverId(c.id);
+                },
+                onDrop: (e) => {
+                  e.preventDefault();
+                  if (dragId !== null) moveChart(dragId, c.id);
+                  setDragId(null);
+                  setOverId(null);
+                },
+              }}
               onSelect={() => select(c.id)}
               onRemove={() => removeChart(c.id)}
             />
