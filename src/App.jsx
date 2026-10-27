@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 import { downloadCsv, parseCsv, toCsv } from './csv';
@@ -55,7 +55,13 @@ function CsvIcon() {
   );
 }
 
-function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, canRemove, onSelect, onRemove }) {
+function chartCardClassName({ selected, dragging, over }) {
+  return ['chart-card', selected && 'selected', dragging && 'dragging', over && 'drop-target']
+    .filter(Boolean)
+    .join(' ');
+}
+
+function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, canRemove, reorder, onSelect, onRemove }) {
   const { rows } = data;
   const { chartType, title } = chart;
   const { xCol, yCols } = resolveColumns(chart, data);
@@ -79,7 +85,7 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
     const colour = highchartsColourOptions(palette, resolvedTheme);
     return {
       colors: colour.colors,
-      chart: { ...colour.chart, height, style: { ...colour.chart.style, fontFamily: 'inherit' } },
+      chart: { ...colour.chart, style: { ...colour.chart.style, fontFamily: 'inherit' } },
       title: { ...colour.title, text: title || null },
       credits: { enabled: false },
       xAxis: { ...colour.xAxis, categories: rows.map(label), title: { ...colour.xAxis.title, text: xCol } },
@@ -100,23 +106,12 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
       },
       series,
     };
-  }, [rows, xCol, yCols.join('|'), chartType, title, height, palette, resolvedTheme]);
+  }, [rows, xCol, yCols.join('|'), chartType, title, palette, resolvedTheme]);
 
   const hasChart = rows.length > 0 && yCols.length > 0;
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-    const onDown = (e) => !menuRef.current?.contains(e.target) && setMenuOpen(false);
-    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
+  const [fullscreen, setFullscreen] = useState(false);
+  const withHeight = (h) => ({ ...options, chart: { ...options.chart, height: h } });
 
   const exportCsv = () => {
     const cols = [xCol, ...(chartType === 'pie' ? yCols.slice(0, 1) : yCols)];
@@ -125,51 +120,137 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
     setMenuOpen(false);
   };
 
+  useEffect(() => {
+    if (!fullscreen && !menuOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      setFullscreen(false);
+      setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen, menuOpen]);
+
   return (
-    <section className={`chart-card${selected ? ' selected' : ''}`} onClick={onSelect}>
-      <div className="cell-menu" ref={menuRef} onClick={(e) => e.stopPropagation()}>
+    <section
+      className={chartCardClassName({ selected, dragging: reorder.dragging, over: reorder.over })}
+      onClick={onSelect}
+      onDragOver={reorder.onDragOver}
+      onDrop={reorder.onDrop}
+    >
+      {canRemove && (
+        <span
+          className="drag-handle"
+          draggable
+          role="button"
+          aria-label="Drag to reorder chart"
+          title="Drag to reorder"
+          onDragStart={reorder.onDragStart}
+          onDragEnd={reorder.onDragEnd}
+          onClick={(e) => e.stopPropagation()}
+        >
+          ⠿
+        </span>
+      )}
+      <div className="chart-menu">
         <button
-          className="cell-menu-btn"
-          aria-label="Chart menu"
+          className="chart-menu-btn"
+          aria-label="Chart options"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          title="Chart menu"
-          onClick={() => setMenuOpen((o) => !o)}
+          title="Chart options"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen((o) => !o);
+          }}
         >
-          {'⋮'}
+          ⋯
         </button>
         {menuOpen && (
-          <div className="cell-menu-list" role="menu">
-            <button role="menuitem" disabled={!hasChart} onClick={exportCsv}>
-              <CsvIcon />
-              Download as CSV
-            </button>
-            {canRemove && (
+          <>
+            <div
+              className="chart-menu-backdrop"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(false);
+              }}
+            />
+            <div className="chart-menu-list" role="menu">
               <button
                 role="menuitem"
-                className="danger"
-                onClick={() => {
+                disabled={!hasChart}
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMenuOpen(false);
-                  onRemove();
+                  setFullscreen(true);
                 }}
               >
-                <span className="menu-icon remove-icon" aria-hidden="true">
-                  {'×'}
-                </span>
-                Remove chart
+                View fullscreen
               </button>
-            )}
-          </div>
+              <button
+                role="menuitem"
+                disabled={!hasChart}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportCsv();
+                }}
+              >
+                <CsvIcon />
+                Download as CSV
+              </button>
+              {canRemove && (
+                <button
+                  role="menuitem"
+                  className="danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    onRemove();
+                  }}
+                >
+                  Remove chart
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
       {hasChart ? (
-        <HighchartsReact key={chartType} highcharts={Highcharts} options={options} />
+        <HighchartsReact key={chartType} highcharts={Highcharts} options={withHeight(height)} />
       ) : (
         <p className="empty">
           {rows.length === 0
             ? 'Paste or upload a CSV with a header row to get started.'
             : 'Select at least one value column to plot.'}
         </p>
+      )}
+      {fullscreen && hasChart && (
+        <div
+          className="fullscreen-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={title || 'Chart'}
+          onClick={(e) => {
+            e.stopPropagation();
+            setFullscreen(false);
+          }}
+        >
+          <div className="fullscreen-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="fullscreen-close"
+              aria-label="Exit fullscreen"
+              title="Exit fullscreen"
+              onClick={() => setFullscreen(false)}
+            >
+              ×
+            </button>
+            <HighchartsReact
+              key={chartType}
+              highcharts={Highcharts}
+              options={withHeight(Math.max(300, window.innerHeight - 120))}
+            />
+          </div>
+        </div>
       )}
     </section>
   );
@@ -224,7 +305,21 @@ export default function App() {
       };
     });
 
-  const toggleY = (col) => {
+  const [dragId, setDragId] = useState(null);
+  const [overId, setOverId] = useState(null);
+
+  // Move a chart to the position of the chart it was dropped on (grid order follows array order).
+  const moveChart = (fromId, toId) =>
+    setSettings((s) => {
+      const from = s.charts.findIndex((c) => c.id === fromId);
+      const to = s.charts.findIndex((c) => c.id === toId);
+      if (from < 0 || to < 0 || from === to) return s;
+      const next = [...s.charts];
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      return { ...s, charts: next };
+    });
+
+  const toggleY =(col) => {
     const next = yCols.includes(col) ? yCols.filter((c) => c !== col) : [...yCols, col];
     updateSelected({ yColumns: valueOptions.filter((c) => next.includes(c)) }); // keep column order
   };
@@ -403,6 +498,33 @@ export default function App() {
               resolvedTheme={resolvedTheme}
               selected={multi && c.id === selected.id}
               canRemove={multi}
+              reorder={{
+                dragging: dragId === c.id,
+                over: dragId !== null && overId === c.id && dragId !== c.id,
+                onDragStart: (e) => {
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', c.id);
+                  const card = e.currentTarget.closest('.chart-card');
+                  if (card) e.dataTransfer.setDragImage(card, 20, 20);
+                  setDragId(c.id);
+                },
+                onDragEnd: () => {
+                  setDragId(null);
+                  setOverId(null);
+                },
+                onDragOver: (e) => {
+                  if (dragId === null) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (overId !== c.id) setOverId(c.id);
+                },
+                onDrop: (e) => {
+                  e.preventDefault();
+                  if (dragId !== null) moveChart(dragId, c.id);
+                  setDragId(null);
+                  setOverId(null);
+                },
+              }}
               onSelect={() => select(c.id)}
               onRemove={() => removeChart(c.id)}
             />
