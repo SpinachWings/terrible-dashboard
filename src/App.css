@@ -369,9 +369,9 @@ legend {
   top: 6px;
   left: 8px;
   z-index: 1;
-  padding: 0 4px;
-  font-size: 1.1rem;
-  line-height: 1.2;
+  padding: 4px 8px;
+  font-size: 1.8rem;
+  line-height: 1;
   color: var(--muted);
   cursor: grab;
   user-select: none;

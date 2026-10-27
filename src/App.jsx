@@ -37,6 +37,12 @@ function resolveColumns(chart, { columns, numericColumns }) {
   return { xCol, valueOptions, yCols };
 }
 
+function chartCardClassName({ selected, dragging, over }) {
+  return ['chart-card', selected && 'selected', dragging && 'dragging', over && 'drop-target']
+    .filter(Boolean)
+    .join(' ');
+}
+
 function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, canRemove, reorder, onSelect, onRemove }) {
   const { rows } = data;
   const { chartType, title } = chart;
@@ -88,7 +94,7 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
 
   return (
     <section
-      className={`chart-card${selected ? ' selected' : ''}${reorder.dragging ? ' dragging' : ''}${reorder.over ? ' drop-target' : ''}`}
+      className={chartCardClassName({ selected, dragging: reorder.dragging, over: reorder.over })}
       onClick={onSelect}
       onDragOver={reorder.onDragOver}
       onDrop={reorder.onDrop}
