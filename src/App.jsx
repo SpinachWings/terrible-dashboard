@@ -106,7 +106,6 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Close the cell menu on outside click or Escape.
   useEffect(() => {
     if (!menuOpen) return undefined;
     const onDown = (e) => !menuRef.current?.contains(e.target) && setMenuOpen(false);
@@ -119,7 +118,6 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
     };
   }, [menuOpen]);
 
-  // Export exactly what the chart plots: the category column plus its value columns.
   const exportCsv = () => {
     const cols = [xCol, ...(chartType === 'pie' ? yCols.slice(0, 1) : yCols)];
     const name = (title || 'chart').trim().replace(/[^\w.-]+/g, '_') || 'chart';
