@@ -89,7 +89,6 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
   const [fullscreen, setFullscreen] = useState(false);
   const withHeight = (h) => ({ ...options, chart: { ...options.chart, height: h } });
 
-  // Escape closes the fullscreen view (or the open menu).
   useEffect(() => {
     if (!fullscreen && !menuOpen) return undefined;
     const onKey = (e) => {
