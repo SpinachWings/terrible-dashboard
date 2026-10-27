@@ -364,6 +364,32 @@ legend {
   color: var(--error);
 }
 
+.drag-handle {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 1;
+  padding: 0 4px;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+}
+
+.drag-handle:hover {
+  color: var(--accent);
+}
+
+.chart-card.dragging {
+  opacity: 0.4;
+}
+
+.chart-card.drop-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
 .chart-tabs {
   display: flex;
   flex-wrap: wrap;
