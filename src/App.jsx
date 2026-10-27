@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
-import { parseCsv } from './csv';
+import { downloadCsv, parseCsv, toCsv } from './csv';
 import { DEFAULT_SETTINGS, loadSettings, newChart, saveSettings } from './storage';
 import { PALETTES, THEME_OPTIONS, highchartsColourOptions, resolveTheme } from './colours';
 
@@ -35,6 +35,24 @@ function resolveColumns(chart, { columns, numericColumns }) {
   const yCols =
     chart.yColumns === null ? valueOptions : chart.yColumns.filter((c) => valueOptions.includes(c));
   return { xCol, valueOptions, yCols };
+}
+
+function CsvIcon() {
+  return (
+    <svg className="menu-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="csv-sheet" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#4facfe" />
+          <stop offset="1" stopColor="#7b61ff" />
+        </linearGradient>
+      </defs>
+      <path d="M5 2h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="url(#csv-sheet)" />
+      <path d="M14 2l5 5h-4a1 1 0 0 1-1-1z" fill="#fff" opacity="0.55" />
+      <path d="M6 9h7M6 11.5h7" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+      <circle cx="16.5" cy="17.5" r="5.5" fill="#2ecc71" stroke="#fff" strokeWidth="1.2" />
+      <path d="M16.5 14.8v5M14.3 18l2.2 2.3 2.2-2.3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function chartCardClassName({ selected, dragging, over }) {
@@ -94,6 +112,13 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
   const [menuOpen, setMenuOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const withHeight = (h) => ({ ...options, chart: { ...options.chart, height: h } });
+
+  const exportCsv = () => {
+    const cols = [xCol, ...(chartType === 'pie' ? yCols.slice(0, 1) : yCols)];
+    const name = (title || 'chart').trim().replace(/[^\w.-]+/g, '_') || 'chart';
+    downloadCsv(`${name}.csv`, toCsv(cols, rows));
+    setMenuOpen(false);
+  };
 
   useEffect(() => {
     if (!fullscreen && !menuOpen) return undefined;
@@ -161,6 +186,17 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
                 }}
               >
                 View fullscreen
+              </button>
+              <button
+                role="menuitem"
+                disabled={!hasChart}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportCsv();
+                }}
+              >
+                <CsvIcon />
+                Download as CSV
               </button>
               {canRemove && (
                 <button
