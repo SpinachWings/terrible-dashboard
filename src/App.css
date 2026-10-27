@@ -347,12 +347,18 @@ legend {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-.remove-chart {
+.cell-menu {
   position: absolute;
   top: 6px;
   right: 8px;
-  z-index: 1;
+  z-index: 5;
+}
+
+.cell-menu-btn {
+  width: 28px;
+  height: 28px;
   border: none;
+  border-radius: 6px;
   background: none;
   font-size: 1.3rem;
   line-height: 1;
@@ -360,8 +366,65 @@ legend {
   cursor: pointer;
 }
 
-.remove-chart:hover {
+.cell-menu-btn:hover,
+.cell-menu-btn[aria-expanded='true'] {
+  background: var(--border);
+  color: var(--text);
+}
+
+.cell-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 180px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.cell-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cell-menu-list button:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.cell-menu-list button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cell-menu-list .danger:hover {
   color: var(--error);
+}
+
+.menu-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.remove-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  line-height: 1;
 }
 
 .chart-tabs {

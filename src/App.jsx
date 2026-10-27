@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
-import { parseCsv } from './csv';
+import { downloadCsv, parseCsv, toCsv } from './csv';
 import { DEFAULT_SETTINGS, loadSettings, newChart, saveSettings } from './storage';
 import { PALETTES, THEME_OPTIONS, highchartsColourOptions, resolveTheme } from './colours';
 
@@ -35,6 +35,24 @@ function resolveColumns(chart, { columns, numericColumns }) {
   const yCols =
     chart.yColumns === null ? valueOptions : chart.yColumns.filter((c) => valueOptions.includes(c));
   return { xCol, valueOptions, yCols };
+}
+
+function CsvIcon() {
+  return (
+    <svg className="menu-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="csv-sheet" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#4facfe" />
+          <stop offset="1" stopColor="#7b61ff" />
+        </linearGradient>
+      </defs>
+      <path d="M5 2h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="url(#csv-sheet)" />
+      <path d="M14 2l5 5h-4a1 1 0 0 1-1-1z" fill="#fff" opacity="0.55" />
+      <path d="M6 9h7M6 11.5h7" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+      <circle cx="16.5" cy="17.5" r="5.5" fill="#2ecc71" stroke="#fff" strokeWidth="1.2" />
+      <path d="M16.5 14.8v5M14.3 18l2.2 2.3 2.2-2.3" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, canRemove, onSelect, onRemove }) {
@@ -85,22 +103,67 @@ function ChartPanel({ chart, data, height, palette, resolvedTheme, selected, can
   }, [rows, xCol, yCols.join('|'), chartType, title, height, palette, resolvedTheme]);
 
   const hasChart = rows.length > 0 && yCols.length > 0;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close the cell menu on outside click or Escape.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => !menuRef.current?.contains(e.target) && setMenuOpen(false);
+    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  // Export exactly what the chart plots: the category column plus its value columns.
+  const exportCsv = () => {
+    const cols = [xCol, ...(chartType === 'pie' ? yCols.slice(0, 1) : yCols)];
+    const name = (title || 'chart').trim().replace(/[^\w.-]+/g, '_') || 'chart';
+    downloadCsv(`${name}.csv`, toCsv(cols, rows));
+    setMenuOpen(false);
+  };
 
   return (
     <section className={`chart-card${selected ? ' selected' : ''}`} onClick={onSelect}>
-      {canRemove && (
+      <div className="cell-menu" ref={menuRef} onClick={(e) => e.stopPropagation()}>
         <button
-          className="remove-chart"
-          aria-label="Remove chart"
-          title="Remove chart"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
+          className="cell-menu-btn"
+          aria-label="Chart menu"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          title="Chart menu"
+          onClick={() => setMenuOpen((o) => !o)}
         >
-          ×
+          {'⋮'}
         </button>
-      )}
+        {menuOpen && (
+          <div className="cell-menu-list" role="menu">
+            <button role="menuitem" disabled={!hasChart} onClick={exportCsv}>
+              <CsvIcon />
+              Download as CSV
+            </button>
+            {canRemove && (
+              <button
+                role="menuitem"
+                className="danger"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRemove();
+                }}
+              >
+                <span className="menu-icon remove-icon" aria-hidden="true">
+                  {'×'}
+                </span>
+                Remove chart
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       {hasChart ? (
         <HighchartsReact key={chartType} highcharts={Highcharts} options={options} />
       ) : (
